@@ -40,11 +40,6 @@ class ArgsBase():
                             default='data/iwslt14/valid',
                             help='valid file')
 
-        parser.add_argument('--test_file',
-                            type=str,
-                            default='data/iwslt14/test',
-                            help='test file')
-
         parser.add_argument('--batch_size',
                             type=int,
                             default=32,
@@ -52,11 +47,13 @@ class ArgsBase():
         return parser
 
 class TranslationDataset(Dataset):
-    def __init__(self, filepath, src_tok, tgt_tok, max_seq_len=256) -> None:
+    def __init__(self, filepath, src_tok, tgt_tok, src_lang, tgt_lang, max_seq_len=256) -> None:
         self.filepath = filepath
         self.src_tokenizer = src_tok
         self.tgt_tokenizer = tgt_tok
         self.max_seq_len = max_seq_len
+        self.src_lang = src_lang
+        self.tgt_lang = tgt_lang
         self.srcs, self.tgts = self.load_data(self.filepath)
 
     def __len__(self):
@@ -119,12 +116,12 @@ class TranslationDataset(Dataset):
     def load_data(self, file_path):
         srcs = []
         tgts = []
-        f = open(file_path + ".de", 'r', encoding="UTF-8")
+        f = open(file_path + "." + self.src_lang, 'r', encoding="UTF-8")
         for line in tqdm(f):
             srcs.append(line.strip())
         f.close()
 
-        f = open(file_path + ".en", 'r', encoding="UTF-8")
+        f = open(file_path + "." + self.tgt_lang, 'r', encoding="UTF-8")
         for line in tqdm(f):
             tgts.append(line.strip())
         f.close()
@@ -133,14 +130,15 @@ class TranslationDataset(Dataset):
         return srcs, tgts
 
 class TranslationModule(pl.LightningDataModule):
-    def __init__(self, train_file, valid_file, test_file, src_tok, tgt_tok, max_len, batch_size=8, num_workers=5):
+    def __init__(self, train_file, valid_file, src_tok, tgt_tok, src_lang, tgt_lang, max_len, batch_size=8, num_workers=5):
         super().__init__()
         self.batch_size = batch_size
         self.train_file_path = train_file
         self.valid_file_path = valid_file
-        self.test_file_path = test_file
         self.src_tok = src_tok
         self.tgt_tok = tgt_tok
+        self.src_lang = src_lang
+        self.tgt_lang = tgt_lang
         self.max_len = max_len
 
         self.num_workers = num_workers
@@ -153,14 +151,21 @@ class TranslationModule(pl.LightningDataModule):
                             type=int,
                             default=5,
                             help='num of worker for dataloader')
+        parser.add_argument('--src_lang',
+                            type=str,
+                            default="src",
+                            help='source language name ex)src, de')
+        parser.add_argument('--tgt_lang',
+                            type=str,
+                            default="tgt",
+                            help='target language name ex)tgt, en')
         return parser
 
     # OPTIONAL, called for every GPU/machine (assigning state is OK)
     def setup(self, stage):
         # split dataset
-        self.train = TranslationDataset(self.train_file_path, self.src_tok, self.tgt_tok, self.max_len)
-        self.valid = TranslationDataset(self.valid_file_path, self.src_tok, self.tgt_tok, self.max_len)
-        self.test = TranslationDataset(self.test_file_path, self.src_tok, self.tgt_tok, self.max_len)
+        self.train = TranslationDataset(self.train_file_path, self.src_tok, self.tgt_tok, self.src_lang, self.tgt_lang, self.max_len)
+        self.valid = TranslationDataset(self.valid_file_path, self.src_tok, self.tgt_tok, self.src_lang, self.tgt_lang, self.max_len)
 
     def train_dataloader(self):
         train = DataLoader(self.train,
@@ -173,12 +178,6 @@ class TranslationModule(pl.LightningDataModule):
                          batch_size=self.batch_size,
                          num_workers=self.num_workers, shuffle=False)
         return val
-
-    def test_dataloader(self):
-        test = DataLoader(self.test,
-                          batch_size=self.batch_size,
-                          num_workers=self.num_workers, shuffle=False)
-        return test
 
 
 class Base(pl.LightningModule):
@@ -302,15 +301,15 @@ if __name__ == '__main__':
 
     dm = TranslationModule(args.train_file,
                            args.valid_file,
-                           args.test_file,
                            model.src_tokenizer, model.tgt_tokenizer,
+                           args.src_lang, args.tgt_lang,
                            args.max_len,
                            batch_size=args.batch_size,
                            num_workers=args.num_workers)
 
     checkpoint_callback = pl.callbacks.ModelCheckpoint(monitor='val_loss',
                                                        dirpath=args.default_root_dir,
-                                                       filename='version3/{epoch:02d}-{val_loss:.3f}',
+                                                       filename='version_4/{epoch:02d}-{val_loss:.3f}',
                                                        verbose=True,
                                                        save_last=True,
                                                        mode='min',

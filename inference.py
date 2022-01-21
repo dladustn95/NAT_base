@@ -57,6 +57,14 @@ if __name__ == '__main__':
     parser.add_argument("--outputfile", default=None, type=str)
     parser.add_argument("--gold_len", default=False, type=bool)
     parser.add_argument("--length_beam_size", default=3, type=int)
+    parser.add_argument('--src_lang',
+                        type=str,
+                        default="src",
+                        help='source language name ex)src, de')
+    parser.add_argument('--tgt_lang',
+                        type=str,
+                        default="tgt",
+                        help='target language name ex)tgt, en')
     args = parser.parse_args()
 
     with open(args.hparams) as f:
@@ -80,13 +88,13 @@ if __name__ == '__main__':
     tgt_tokenizer.read_vocab('data/iwslt14/dict.en')
     """
     src_lines = []
-    f = open(args.testfile + '.de', 'r', encoding="utf-8-sig")
+    f = open(args.testfile + '.' + args.src_lang, 'r', encoding="utf-8-sig")
     for line in f:
         src_lines.append(line)
     f.close()
 
     tgt_lines = []
-    f = open(args.testfile + '.en', 'r', encoding="utf-8-sig")
+    f = open(args.testfile + '.' + args.tgt_lang, 'r', encoding="utf-8-sig")
     for line in f:
         tgt_lines.append(line)
     f.close()
